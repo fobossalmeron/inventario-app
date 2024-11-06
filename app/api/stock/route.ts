@@ -33,12 +33,13 @@ export async function GET() {
       const total = Object.values(warehouseStocks).reduce((sum, cantidad) => sum + cantidad, 0);
 
       return {
+        id: producto.id,
         sku: producto.sku,
-        description: producto.descripcion || "",
+        descripcion: producto.descripcion || "",
         ...warehouseStocks,
         total,
-        minStock: producto.stockMinimo,
-        maxStock: producto.stockMaximo,
+        stockMinimo: producto.stockMinimo,
+        stockMaximo: producto.stockMaximo,
       };
     });
 

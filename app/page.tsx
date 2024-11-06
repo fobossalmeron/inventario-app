@@ -12,41 +12,34 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { StockLimitsModal } from "@/components/modal";
+import { Producto } from "@/types/db";
+import { Dialog } from "@/components/ui/dialog";
+import { useToast } from "@/hooks/use-toast";
 
-interface InventoryItem {
-  sku: string;
-  description: string;
+
+interface InventoryItem extends Producto {
   warehouse1: number;
   warehouse2: number;
   warehouse3: number;
   warehouse4: number;
   warehouse5: number;
   total: number;
-  minStock: number;
-  maxStock: number;
 }
 
 export default function InventoryPage() {
+  const { toast } = useToast();
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedItem, setSelectedItem] = useState<Producto | null>(null);
 
   async function fetchInventory() {
     try {
@@ -68,9 +61,45 @@ export default function InventoryPage() {
   }, []);
 
   const checkStockStatus = (item: InventoryItem) => {
-    if (item.total <= item.minStock) return "min";
-    if (item.total >= item.maxStock) return "max";
+    if (item.stockMinimo != null && item.total <= item.stockMinimo) return "min";
+    if (item.stockMaximo != null && item.total >= item.stockMaximo) return "max";
     return null;
+  };
+
+  const handleConfirm = async (stockMinimo: number, stockMaximo: number) => {
+    if (!selectedItem) return;
+    
+    try {
+      const response = await fetch("/api/update-stock-limits", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          id: selectedItem.id,
+          stockMinimo,
+          stockMaximo,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Error al actualizar límites");
+      }
+
+      await fetchInventory(); // Recargar datos
+      toast({
+        title: "Éxito",
+        description: `Límites actualizados correctamente para: ${selectedItem.sku}`,
+      });
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error instanceof Error ? error.message : "Error desconocido",
+      });
+    } finally {
+      setSelectedItem(null);
+    }
   };
 
   if (isLoading) return <div className="p-4">Cargando inventario...</div>;
@@ -115,7 +144,7 @@ export default function InventoryPage() {
                 <TableCell className="font-medium">{item.sku}</TableCell>
                 <TableCell>
                   <div className="max-w-[150px] truncate hover:text-clip hover:whitespace-normal hover:overflow-visible">
-                    {item.description}
+                    {item.descripcion}
                   </div>
                 </TableCell>
                 <TableCell className="text-right">{(item.warehouse1 || 0).toLocaleString()}</TableCell>
@@ -126,13 +155,13 @@ export default function InventoryPage() {
                 <TableCell className="text-right font-medium">{item.total.toLocaleString()}</TableCell>
                 <TableCell className="text-center">
                   {checkStockStatus(item) === "min" && (
-                    <Badge variant="destructive" className="gap-1">
-                      <AlertTriangle className="h-5 w-5" />
+                    <Badge variant="destructive" className="gap-2 p-2 pointer-events-none">
+                      <AlertTriangle className="h-4 w-4" />
                       Mínimo alcanzado
                     </Badge>
                   )}
                   {checkStockStatus(item) === "max" && (
-                    <Badge variant="warning" className="gap-2 p-2">
+                    <Badge variant="warning" className="gap-2 p-2 pointer-events-none">
                       <AlertTriangle className="h-4 w-4" />
                       Máximo alcanzado
                     </Badge>
@@ -147,61 +176,34 @@ export default function InventoryPage() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuLabel>Acciones</DropdownMenuLabel>
                       <DropdownMenuItem>
-                        Min: {item.minStock.toLocaleString()}
+                        Min: {item.stockMinimo?.toLocaleString()}
                       </DropdownMenuItem>
                       <DropdownMenuItem>
-                        Max: {item.maxStock.toLocaleString()}
+                        Max: {item.stockMaximo?.toLocaleString()}
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
-                      <DialogTrigger asChild>
-                        <DropdownMenuItem>Fijar min/max</DropdownMenuItem>
-                      </DialogTrigger>
+                      <DropdownMenuItem onSelect={() => setSelectedItem(item)}>
+                        <Button variant="default" className="w-full justify-start">
+                          Fijar min/max
+                        </Button>
+                      </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
-                  <Dialog>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Establecer límites de stock</DialogTitle>
-                      </DialogHeader>
-                      <div className="grid gap-4 py-4">
-                        <div className="grid grid-cols-4 items-center gap-4">
-                          <Label htmlFor="min" className="text-right">
-                            Stock mínimo
-                          </Label>
-                          <Input
-                            id="min"
-                            type="number"
-                            className="col-span-3"
-                            placeholder="Ingrese el stock mínimo"
-                            defaultValue={item.minStock}
-                          />
-                        </div>
-                        <div className="grid grid-cols-4 items-center gap-4">
-                          <Label htmlFor="max" className="text-right">
-                            Stock máximo
-                          </Label>
-                          <Input
-                            id="max"
-                            type="number"
-                            className="col-span-3"
-                            placeholder="Ingrese el stock máximo"
-                            defaultValue={item.maxStock}
-                          />
-                        </div>
-                      </div>
-                      <div className="flex justify-end">
-                        <Button type="submit">Guardar</Button>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
                 </TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
       </div>
+      <Dialog open={!!selectedItem} onOpenChange={(open) => !open && setSelectedItem(null)}>
+        {selectedItem && (
+          <StockLimitsModal 
+            item={selectedItem} 
+            onConfirm={handleConfirm}
+          />
+        )}
+      </Dialog>
     </main>
   );
 }
