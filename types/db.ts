@@ -2,8 +2,8 @@ export interface Producto {
   id: number;
   sku: string;
   descripcion?: string | null;
-  stockMinimo: number;
-  stockMaximo: number;
+  stockMinimo?: number;
+  stockMaximo?: number;
   inventarios?: Inventario[];
 }
 
