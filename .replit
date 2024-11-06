@@ -1,0 +1,13 @@
+modules = ["nodejs-20", "web"]
+run = "yarn dev"
+
+[nix]
+channel = "stable-24_05"
+
+[deployment]
+run = ["sh", "-c", "yarn dev"]
+deploymentTarget = "cloudrun"
+
+[[ports]]
+localPort = 3000
+externalPort = 80
