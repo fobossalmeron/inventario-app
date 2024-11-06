@@ -1,9 +1,6 @@
-import { prisma } from "@/lib/db";
 import { NextRequest } from "next/server";
-import { PrismaClient } from "@prisma/client";
-import { Almacen } from "@/types/db";
-
-type TransactionClient = Omit<PrismaClient, "$connect" | "$disconnect" | "$on" | "$transaction" | "$use">;
+import db from "@/lib/db";
+import { Producto, Almacen } from "@/types/db";
 
 async function parseCSV(csvData: string) {
   const rows = csvData
@@ -12,8 +9,13 @@ async function parseCSV(csvData: string) {
     .filter(Boolean)
     .map((line) => {
       const [sku, descripcion, stock] = line.split(",").map(val => val.trim());
-      return { sku, descripcion, stock };
-    });
+      return { 
+        sku, 
+        descripcion, 
+        stock: parseInt(stock) || 0
+      };
+    })
+    .filter(row => row.sku && !isNaN(row.stock));
   return rows;
 }
 
@@ -27,18 +29,14 @@ export async function POST(req: NextRequest) {
       return new Response('Archivo y almacén son requeridos', { status: 400 });
     }
 
-    // Verificar que el almacén existe y mostrar todos los almacenes para debug
-    const almacenes = await prisma.almacen.findMany();
-    console.log('Almacenes disponibles:', almacenes);
-
-    const almacen = await prisma.almacen.findUnique({
-      where: { id: almacenId }
-    });
-
+    // Verificar que el almacén existe
+    const almacen = db.prepare('SELECT * FROM Almacen WHERE id = ?').get(almacenId);
+    
     if (!almacen) {
+      const almacenes = db.prepare('SELECT id, nombre FROM Almacen').all() as Almacen[];
       return new Response(
         JSON.stringify({
-          error: `El almacén ${almacenId} no existe. Almacenes disponibles: ${almacenes.map((a: Almacen) => `${a.id}: ${a.nombre}`).join(', ')}`
+          error: `El almacén ${almacenId} no existe. Almacenes disponibles: ${almacenes.map(a => `${a.id}: ${a.nombre}`).join(', ')}`
         }), 
         { 
           status: 400,
@@ -50,55 +48,74 @@ export async function POST(req: NextRequest) {
     const csvData = await file.text();
     const rows = await parseCSV(csvData);
 
-    await prisma.$transaction(async (tx: TransactionClient) => {
+    // Preparar statements fuera de la transacción
+    const insertOrUpdateProducto = db.prepare(`
+      INSERT INTO Producto (sku, nombre, descripcion, stockMinimo, stockMaximo)
+      VALUES (@sku, @sku, @descripcion, 0, 999999)
+      ON CONFLICT(sku) DO UPDATE SET
+      descripcion = COALESCE(excluded.descripcion, descripcion)
+      RETURNING id, sku, nombre, descripcion, stockMinimo, stockMaximo
+    `);
+
+    const updateInventario = db.prepare(`
+      INSERT INTO Inventario (productoId, almacenId, cantidad)
+      VALUES (@productoId, @almacenId, @cantidad)
+      ON CONFLICT(productoId, almacenId) DO UPDATE SET
+      cantidad = excluded.cantidad,
+      updatedAt = CURRENT_TIMESTAMP
+    `);
+
+    const result = db.transaction(() => {
+      let updatedProducts = 0;
+      let updatedInventory = 0;
+
       for (const row of rows) {
-        console.log(`Procesando SKU: ${row.sku}`);
-        
-        // Primero buscar o crear el producto
-        const producto = await tx.producto.upsert({
-          where: { sku: row.sku },
-          create: {
-            sku: row.sku,
-            descripcion: row.descripcion,
-            stockMinimo: 0,
-            stockMaximo: 999999
-          },
-          update: {}
+        if (!row.sku) continue;
+
+        // Insertar o actualizar producto
+        const producto = insertOrUpdateProducto.get({
+          sku: row.sku,
+          descripcion: row.descripcion
+        }) as Producto;
+
+        // Actualizar inventario
+        const inventarioResult = updateInventario.run({
+          productoId: producto.id,
+          almacenId: almacenId,
+          cantidad: row.stock
         });
 
-        console.log(`Producto creado/actualizado: ${producto.id}`);
-
-        // Luego actualizar el inventario
-        await tx.inventario.upsert({
-          where: {
-            productoId_almacenId: {
-              productoId: producto.id,
-              almacenId
-            }
-          },
-          create: {
-            productoId: producto.id,
-            almacenId,
-            cantidad: Number(row.stock)
-          },
-          update: {
-            cantidad: Number(row.stock)
-          }
-        });
-
-        console.log(`Inventario actualizado para producto ${producto.id} en almacén ${almacenId}`);
+        if (inventarioResult.changes > 0) {
+          updatedInventory++;
+        }
+        updatedProducts++;
       }
-    });
 
-    return new Response('Stock actualizado correctamente', { status: 200 });
+      return { updatedProducts, updatedInventory };
+    })();
+
+    return new Response(
+      JSON.stringify({
+        message: `Stock actualizado correctamente. Productos: ${result.updatedProducts}, Inventario: ${result.updatedInventory}`,
+        success: true
+      }), 
+      { 
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      }
+    );
+
   } catch (error) {
     console.error('Error detallado:', error);
-    if (error instanceof Error) {
-      return new Response(JSON.stringify({ error: error.message }), { 
+    return new Response(
+      JSON.stringify({ 
+        error: error instanceof Error ? error.message : 'Error al procesar el archivo',
+        success: false
+      }), 
+      { 
         status: 500,
         headers: { 'Content-Type': 'application/json' }
-      });
-    }
-    return new Response('Error al procesar el archivo', { status: 500 });
+      }
+    );
   }
 } 

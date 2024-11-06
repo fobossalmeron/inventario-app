@@ -25,13 +25,15 @@ import { Dialog } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 
 
-interface InventoryItem extends Producto {
+interface InventoryItem extends Omit<Producto, 'id'> {
+  id: number;
   warehouse1: number;
   warehouse2: number;
   warehouse3: number;
   warehouse4: number;
   warehouse5: number;
   total: number;
+  almacenId?: number;
 }
 
 export default function InventoryPage() {
@@ -70,6 +72,8 @@ export default function InventoryPage() {
     if (!selectedItem) return;
     
     try {
+      console.log('Enviando datos:', { id: selectedItem.id, stockMinimo, stockMaximo }); // Debug
+
       const response = await fetch("/api/update-stock-limits", {
         method: "POST",
         headers: {
@@ -77,13 +81,14 @@ export default function InventoryPage() {
         },
         body: JSON.stringify({
           id: selectedItem.id,
-          stockMinimo,
-          stockMaximo,
+          stockMinimo: Number(stockMinimo),
+          stockMaximo: Number(stockMaximo)
         }),
       });
 
       if (!response.ok) {
-        throw new Error("Error al actualizar límites");
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Error al actualizar límites");
       }
 
       await fetchInventory(); // Recargar datos
@@ -138,7 +143,7 @@ export default function InventoryPage() {
           <TableBody>
             {inventory.map((item) => (
               <TableRow 
-                key={item.sku} 
+                key={item.sku}
                 className={item.sku.startsWith('GCP') ? 'bg-blue-50' : ''}
               >
                 <TableCell className="font-medium">{item.sku}</TableCell>
@@ -152,7 +157,7 @@ export default function InventoryPage() {
                 <TableCell className="text-right">{(item.warehouse3 || 0).toLocaleString()}</TableCell>
                 <TableCell className="text-right">{(item.warehouse4 || 0).toLocaleString()}</TableCell>
                 <TableCell className="text-right">{(item.warehouse5 || 0).toLocaleString()}</TableCell>
-                <TableCell className="text-right font-medium">{item.total.toLocaleString()}</TableCell>
+                <TableCell className="text-right font-medium">{(item.total || 0).toLocaleString()}</TableCell>
                 <TableCell className="text-center">
                   {checkStockStatus(item) === "min" && (
                     <Badge variant="destructive" className="gap-2 p-2 pointer-events-none">
