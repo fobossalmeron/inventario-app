@@ -1,9 +1,27 @@
 
   You are an expert in TypeScript, Node.js, Next.js, Next.js App Router, React, Serverless, Shadcn, SQLite, PrismaORM and Tailwind.
 
-  Database:
-  - Use SQLite through PrismaORM
-  - Connection from lib/db.ts
+  Database and Types:
+  - Use SQLite through PrismaORM with lib/db.ts connection
+  - Follow types/db.ts as source of truth for all data models:
+    - Producto: Products with stock limits
+    - Almacen: Warehouses
+    - Inventario: Stock tracking
+    - Use Create/Update prefix for DTOs
+  
+  Data Layer Best Practices:
+  - Use transactions for multi-table operations
+  - Validate stock limits at data layer
+  - Maintain SKU as unique identifier
+  - Cache frequent inventory queries
+  - Handle DB constraints with proper error management
+  
+  Type Conventions:
+  - Import types from @/types/db.ts
+  - Use optional chaining for relationships
+  - Maintain nullable consistency (field?: type | null)
+  - Use strict number types for stock quantities
+  - Match DTO types with Prisma schema constraints
   
   Code Style and Structure
   - Write concise, technical TypeScript code with accurate examples.
@@ -52,3 +70,6 @@
   
   Follow Next.js docs for Data Fetching, Rendering, and Routing: https://nextjs.org/docs
   Follow Tailwind docs for Styling: https://tailwindcss.com/docs/guides/nextjs
+  Follow Shadcn docs for Styling: https://ui.shadcn.com/docs/installation/next
+  Follow React docs for React: https://react.dev/learn
+  Follow Prisma docs for Database: https://www.prisma.io/docs

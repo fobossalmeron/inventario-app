@@ -1,0 +1,40 @@
+// This is your Prisma schema file
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Producto {
+  id          Int         @id @default(autoincrement())
+  sku         String      @unique
+  descripcion String?
+  stockMinimo Int
+  stockMaximo Int
+  inventarios Inventario[]
+
+  @@map("productos")
+  @@index([sku])
+}
+
+model Almacen {
+  id          Int         @id @default(autoincrement())
+  nombre      String
+  inventarios Inventario[]
+
+  @@map("almacenes")
+}
+
+model Inventario {
+  producto    Producto @relation(fields: [productoId], references: [id])
+  productoId  Int
+  almacen     Almacen  @relation(fields: [almacenId], references: [id])
+  almacenId   Int
+  cantidad    Int      @default(0)
+
+  @@id([productoId, almacenId])
+  @@map("inventario")
+} 
