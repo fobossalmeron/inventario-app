@@ -32,6 +32,7 @@ interface InventoryItem extends Omit<Producto, 'id'> {
   warehouse3: number;
   warehouse4: number;
   warehouse5: number;
+  tiempoDeResurtido: number;
   total: number;
   almacenId?: number;
 }
@@ -68,12 +69,10 @@ export default function InventoryPage() {
     return null;
   };
 
-  const handleConfirm = async (stockMinimo: number, stockMaximo: number) => {
+  const handleConfirm = async (stockMinimo: number, stockMaximo: number, tiempoDeResurtido: number) => {
     if (!selectedItem) return;
     
     try {
-      console.log('Enviando datos:', { id: selectedItem.id, stockMinimo, stockMaximo }); // Debug
-
       const response = await fetch("/api/update-stock-limits", {
         method: "POST",
         headers: {
@@ -82,7 +81,8 @@ export default function InventoryPage() {
         body: JSON.stringify({
           id: selectedItem.id,
           stockMinimo: Number(stockMinimo),
-          stockMaximo: Number(stockMaximo)
+          stockMaximo: Number(stockMaximo),
+          tiempoDeResurtido: Number(tiempoDeResurtido)
         }),
       });
 
@@ -94,7 +94,7 @@ export default function InventoryPage() {
       await fetchInventory(); // Recargar datos
       toast({
         title: "Éxito",
-        description: `Límites actualizados correctamente para: ${selectedItem.sku}`,
+        description: `Datos actualizados correctamente para: ${selectedItem.sku}`,
       });
     } catch (error) {
       toast({
@@ -137,6 +137,7 @@ export default function InventoryPage() {
               <TableHead className="text-right">Almacén #5</TableHead>
               <TableHead className="text-right">Total</TableHead>
               <TableHead className="text-center">Alerta</TableHead>
+              <TableHead className="text-right">Resurtido</TableHead>
               <TableHead className="text-right">Acciones</TableHead>
             </TableRow>
           </TableHeader>
@@ -172,6 +173,7 @@ export default function InventoryPage() {
                     </Badge>
                   )}
                 </TableCell>
+                <TableCell className="text-right">{item.tiempoDeResurtido} días</TableCell>
                 <TableCell className="text-right">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -190,7 +192,7 @@ export default function InventoryPage() {
                       <DropdownMenuSeparator />
                       <DropdownMenuItem onSelect={() => setSelectedItem(item)}>
                         <Button variant="default" className="w-full justify-start">
-                          Fijar min/max
+                          Editar
                         </Button>
                       </DropdownMenuItem>
                     </DropdownMenuContent>

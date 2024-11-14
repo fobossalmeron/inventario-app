@@ -7,16 +7,51 @@ async function main() {
       // Desactivar las restricciones de clave foránea temporalmente
       db.prepare('PRAGMA foreign_keys = OFF').run();
 
-      // Limpiar tablas en orden correcto (debido a las relaciones)
-      db.prepare("DELETE FROM 'Inventario'").run();
-      db.prepare("DELETE FROM 'Producto'").run();
-      db.prepare("DELETE FROM 'Almacen'").run();
-      
-      // Reiniciar los contadores de autoincremento
-      db.prepare("DELETE FROM sqlite_sequence WHERE name IN ('Inventario', 'Producto', 'Almacen')").run();
+      // Eliminar tablas si existen para recrearlas
+      db.prepare('DROP TABLE IF EXISTS "Inventario"').run();
+      db.prepare('DROP TABLE IF EXISTS "Producto"').run();
+      db.prepare('DROP TABLE IF EXISTS "Almacen"').run();
 
-      // Reactivar las restricciones de clave foránea
-      db.prepare('PRAGMA foreign_keys = ON').run();
+      // Crear tabla Producto con el nuevo campo tiempoDeResurtido
+      db.prepare(`
+        CREATE TABLE Producto (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          sku TEXT UNIQUE NOT NULL,
+          nombre TEXT NOT NULL,
+          descripcion TEXT,
+          stockMinimo INTEGER NOT NULL DEFAULT 0,
+          stockMaximo INTEGER NOT NULL DEFAULT 0,
+          tiempoDeResurtido INTEGER NOT NULL DEFAULT 0,
+          createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+      `).run();
+
+      // Crear tabla Almacen
+      db.prepare(`
+        CREATE TABLE Almacen (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          nombre TEXT UNIQUE NOT NULL,
+          ubicacion TEXT,
+          createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+      `).run();
+
+      // Crear tabla Inventario
+      db.prepare(`
+        CREATE TABLE Inventario (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          productoId INTEGER NOT NULL,
+          almacenId INTEGER NOT NULL,
+          cantidad INTEGER NOT NULL DEFAULT 0,
+          createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (productoId) REFERENCES Producto(id),
+          FOREIGN KEY (almacenId) REFERENCES Almacen(id),
+          UNIQUE(productoId, almacenId)
+        )
+      `).run();
 
       // Preparar las sentencias una sola vez fuera del loop
       const insertAlmacen = db.prepare(`
@@ -25,8 +60,8 @@ async function main() {
       `);
 
       const insertProducto = db.prepare(`
-        INSERT INTO Producto (sku, nombre, descripcion, stockMinimo, stockMaximo)
-        VALUES (@sku, @nombre, @descripcion, @stockMinimo, @stockMaximo)
+        INSERT INTO Producto (sku, nombre, descripcion, stockMinimo, stockMaximo, tiempoDeResurtido)
+        VALUES (@sku, @nombre, @descripcion, @stockMinimo, @stockMaximo, @tiempoDeResurtido)
       `);
 
       const insertInventario = db.prepare(`
@@ -34,7 +69,7 @@ async function main() {
         VALUES (@productoId, @almacenId, @cantidad)
       `);
 
-      // Insertar almacenes usando named parameters
+      // Insertar almacenes
       const almacenes = [
         { nombre: 'Almacén Central', ubicacion: 'CDMX' },
         { nombre: 'Almacén Norte', ubicacion: 'Monterrey' },
@@ -47,28 +82,31 @@ async function main() {
         insertAlmacen.run(almacen);
       }
 
-      // Insertar productos usando named parameters
+      // Insertar productos con tiempoDeResurtido
       const productos = [
         { 
           sku: 'KIT90-079', 
           nombre: 'Kit X-Pression "R" CCO Smile System', 
           descripcion: 'Kit ortodóntico completo', 
-          stockMinimo: 69, 
-          stockMaximo: 100 
+          stockMinimo: 10, 
+          stockMaximo: 100,
+          tiempoDeResurtido: 15 // días
         },
         { 
           sku: 'KIT90-089', 
           nombre: 'Kit X-Pression "C" CCO Smile System c/secuencia metálica', 
           descripcion: 'Kit ortodóntico con secuencia metálica', 
           stockMinimo: 15, 
-          stockMaximo: 120 
+          stockMaximo: 150,
+          tiempoDeResurtido: 20 // días
         },
         { 
           sku: '90-085-01', 
           nombre: 'Juego de brackets X-pression "C" CCO c/g.345 .022', 
           descripcion: 'Juego de brackets completo', 
           stockMinimo: 5, 
-          stockMaximo: 50 
+          stockMaximo: 50,
+          tiempoDeResurtido: 10 // días
         }
       ];
 
@@ -76,7 +114,7 @@ async function main() {
         insertProducto.run(producto);
       }
 
-      // Insertar inventario usando named parameters
+      // Insertar inventario
       const inventarios = [
         { productoId: 1, almacenId: 1, cantidad: 23 },
         { productoId: 1, almacenId: 2, cantidad: 15 },

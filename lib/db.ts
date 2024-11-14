@@ -15,6 +15,7 @@ db.exec(`
     descripcion TEXT,
     stockMinimo INTEGER NOT NULL DEFAULT 0,
     stockMaximo INTEGER NOT NULL DEFAULT 0,
+    tiempoDeResurtido INTEGER NOT NULL DEFAULT 7,
     createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
     updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
   );

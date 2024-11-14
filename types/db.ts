@@ -5,6 +5,7 @@ export interface Producto {
   descripcion: string | null;
   stockMinimo: number;
   stockMaximo: number;
+  tiempoDeResurtido: number;
   createdAt: string;
   updatedAt: string;
 }

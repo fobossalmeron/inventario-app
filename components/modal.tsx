@@ -13,7 +13,7 @@ import { Producto } from "@/types/db";
 
 interface StockLimitsModalProps {
   item: Producto;
-  onConfirm: (stockMinimo: number, stockMaximo: number) => void;
+  onConfirm: (stockMinimo: number, stockMaximo: number, tiempoDeResurtido: number) => void;
 }
 
 export function StockLimitsModal({ item, onConfirm }: StockLimitsModalProps) {
@@ -22,7 +22,8 @@ export function StockLimitsModal({ item, onConfirm }: StockLimitsModalProps) {
     const formData = new FormData(e.currentTarget)
     const stockMinimo = Number(formData.get("stockMinimo"))
     const stockMaximo = Number(formData.get("stockMaximo"))
-    onConfirm(stockMinimo, stockMaximo)
+    const tiempoDeResurtido = Number(formData.get("tiempoDeResurtido"))
+    onConfirm(stockMinimo, stockMaximo, tiempoDeResurtido)
   }
 
   return (
@@ -62,8 +63,19 @@ export function StockLimitsModal({ item, onConfirm }: StockLimitsModalProps) {
             />
           </div>
         </div>
+        <div className="space-y-2">
+          <Label htmlFor="tiempoDeResurtido">Tiempo de resurtido (días)</Label>
+          <Input
+            id="tiempoDeResurtido"
+            name="tiempoDeResurtido"
+            type="number"
+            placeholder="Días para resurtir"
+            className="h-12"
+            defaultValue={item.tiempoDeResurtido}
+          />
+        </div>
         <Button type="submit" className="w-full h-12">
-          Confirmar montos
+          Guardar cambios
         </Button>
       </form>
     </DialogContent>
