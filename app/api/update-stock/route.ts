@@ -3,8 +3,50 @@ import db from "@/lib/db";
 import { Producto, Almacen } from "@/types/db";
 
 async function parseCSV(csvData: string) {
-  const rows = csvData
-    .split("\n")
+  const lines = csvData.split("\n").filter(Boolean);
+  
+  // Detectar el formato del archivo basado en la primera línea
+  const isValuacionFormat = lines[0].includes("Valuaci");
+  
+  if (isValuacionFormat) {
+    // Procesar formato de valuación
+    return lines
+      .slice(2) // Saltar encabezados
+      .filter(line => line.includes(",")) // Filtrar líneas válidas
+      .map(line => {
+        const columns = line.split(",");
+        const sku = columns[0].replace(/"/g, '').trim();
+        const descripcion = columns[1].replace(/"/g, '').trim();
+        // El stock está en la columna 3 (índice 2) para algunos registros
+        // y en la columna 4 (índice 3) para otros
+        let stock = 0;
+        if (columns[3] && columns[3].trim()) {
+          stock = parseFloat(columns[3].replace(/"/g, '').trim());
+        } else if (columns[2] && columns[2].trim()) {
+          stock = parseFloat(columns[2].replace(/"/g, '').trim());
+        }
+        
+        return {
+          sku,
+          descripcion,
+          stock: isNaN(stock) ? 0 : Math.round(stock) // Redondeamos para manejar decimales
+        };
+      })
+      .filter(row => {
+        const diasSemana = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+        const esFechaOPagina = diasSemana.some(dia => row.sku.includes(dia)) || row.sku.includes('Página');
+        
+        return row.sku && 
+               !row.sku.includes('Total') && 
+               !row.sku.includes('Artículo') &&
+               !row.sku.includes('Valuaci') &&
+               !esFechaOPagina &&
+               row.sku.trim() !== '';
+      });
+  }
+  
+  // Procesar formato original (almacen_random.csv)
+  return lines
     .slice(1)
     .filter(Boolean)
     .map((line) => {
@@ -16,7 +58,6 @@ async function parseCSV(csvData: string) {
       };
     })
     .filter(row => row.sku && !isNaN(row.stock));
-  return rows;
 }
 
 export async function POST(req: NextRequest) {
@@ -45,7 +86,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const csvData = await file.text();
+    const buffer = await file.arrayBuffer();
+    const csvData = new TextDecoder('latin1').decode(buffer);
+    
     const rows = await parseCSV(csvData);
 
     // Preparar statements fuera de la transacción
