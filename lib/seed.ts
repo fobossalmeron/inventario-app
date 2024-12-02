@@ -31,8 +31,8 @@ async function main() {
       db.prepare(`
         CREATE TABLE Almacen (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
-          nombre TEXT UNIQUE NOT NULL,
-          ubicacion TEXT,
+          codigo TEXT UNIQUE NOT NULL,
+          nombre TEXT NOT NULL,
           createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
           updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
         )
@@ -53,88 +53,28 @@ async function main() {
         )
       `).run();
 
-      // Preparar las sentencias una sola vez fuera del loop
+      // Preparar la sentencia para insertar almacenes
       const insertAlmacen = db.prepare(`
-        INSERT INTO Almacen (nombre, ubicacion) 
-        VALUES (@nombre, @ubicacion)
-      `);
-
-      const insertProducto = db.prepare(`
-        INSERT INTO Producto (sku, nombre, descripcion, stockMinimo, stockMaximo, tiempoDeResurtido)
-        VALUES (@sku, @nombre, @descripcion, @stockMinimo, @stockMaximo, @tiempoDeResurtido)
-      `);
-
-      const insertInventario = db.prepare(`
-        INSERT INTO Inventario (productoId, almacenId, cantidad)
-        VALUES (@productoId, @almacenId, @cantidad)
+        INSERT INTO Almacen (codigo, nombre) 
+        VALUES (@codigo, @nombre)
       `);
 
       // Insertar almacenes
       const almacenes = [
-        { nombre: 'Almacén Central', ubicacion: 'CDMX' },
-        { nombre: 'Almacén Norte', ubicacion: 'Monterrey' },
-        { nombre: 'Almacén Sur', ubicacion: 'Mérida' },
-        { nombre: 'Almacén Este', ubicacion: 'Veracruz' },
-        { nombre: 'Almacén Oeste', ubicacion: 'Guadalajara' }
+        { codigo: '0001-AGV', nombre: 'General para Venta' },
+        { codigo: '0002-APROD', nombre: 'Producción' },
+        { codigo: '0003-AMAQU', nombre: 'Maquila' },
+        { codigo: '0004-APRES', nombre: 'Presoldado' },
+        { codigo: '0005-ABCK', nombre: 'Bracket' },
+        { codigo: '0006-AGUD', nombre: 'Guadalajara' },
+        { codigo: '0007-AGOM', nombre: 'Gómez Farías' },
+        { codigo: '0008-AMON', nombre: 'Monterrey' },
+        { codigo: '0009-AEM', nombre: 'Empaque' },
+        { codigo: '0010-ARM', nombre: 'Recepción de Mercancía' }
       ];
       
       for (const almacen of almacenes) {
         insertAlmacen.run(almacen);
-      }
-
-      // Insertar productos con tiempoDeResurtido
-      const productos = [
-        { 
-          sku: 'KIT90-079', 
-          nombre: 'Kit X-Pression "R" CCO Smile System', 
-          descripcion: 'Kit ortodóntico completo', 
-          stockMinimo: 10, 
-          stockMaximo: 100,
-          tiempoDeResurtido: 15 // días
-        },
-        { 
-          sku: 'KIT90-089', 
-          nombre: 'Kit X-Pression "C" CCO Smile System c/secuencia metálica', 
-          descripcion: 'Kit ortodóntico con secuencia metálica', 
-          stockMinimo: 15, 
-          stockMaximo: 150,
-          tiempoDeResurtido: 20 // días
-        },
-        { 
-          sku: '90-085-01', 
-          nombre: 'Juego de brackets X-pression "C" CCO c/g.345 .022', 
-          descripcion: 'Juego de brackets completo', 
-          stockMinimo: 5, 
-          stockMaximo: 50,
-          tiempoDeResurtido: 10 // días
-        }
-      ];
-
-      for (const producto of productos) {
-        insertProducto.run(producto);
-      }
-
-      // Insertar inventario
-      const inventarios = [
-        { productoId: 1, almacenId: 1, cantidad: 23 },
-        { productoId: 1, almacenId: 2, cantidad: 15 },
-        { productoId: 1, almacenId: 3, cantidad: 10 },
-        { productoId: 1, almacenId: 4, cantidad: 8 },
-        { productoId: 1, almacenId: 5, cantidad: 12 },
-        { productoId: 2, almacenId: 1, cantidad: 45 },
-        { productoId: 2, almacenId: 2, cantidad: 25 },
-        { productoId: 2, almacenId: 3, cantidad: 20 },
-        { productoId: 2, almacenId: 4, cantidad: 15 },
-        { productoId: 2, almacenId: 5, cantidad: 18 },
-        { productoId: 3, almacenId: 1, cantidad: 12 },
-        { productoId: 3, almacenId: 2, cantidad: 8 },
-        { productoId: 3, almacenId: 3, cantidad: 6 },
-        { productoId: 3, almacenId: 4, cantidad: 5 },
-        { productoId: 3, almacenId: 5, cantidad: 7 }
-      ];
-
-      for (const inventario of inventarios) {
-        insertInventario.run(inventario);
       }
     });
 

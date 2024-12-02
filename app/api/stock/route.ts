@@ -13,6 +13,11 @@ export async function GET() {
         SUM(CASE WHEN i.almacenId = 3 THEN i.cantidad ELSE 0 END) as warehouse3,
         SUM(CASE WHEN i.almacenId = 4 THEN i.cantidad ELSE 0 END) as warehouse4,
         SUM(CASE WHEN i.almacenId = 5 THEN i.cantidad ELSE 0 END) as warehouse5,
+        SUM(CASE WHEN i.almacenId = 6 THEN i.cantidad ELSE 0 END) as warehouse6,
+        SUM(CASE WHEN i.almacenId = 7 THEN i.cantidad ELSE 0 END) as warehouse7,
+        SUM(CASE WHEN i.almacenId = 8 THEN i.cantidad ELSE 0 END) as warehouse8,
+        SUM(CASE WHEN i.almacenId = 9 THEN i.cantidad ELSE 0 END) as warehouse9,
+        SUM(CASE WHEN i.almacenId = 10 THEN i.cantidad ELSE 0 END) as warehouse10,
         SUM(i.cantidad) as total
       FROM Producto p
       LEFT JOIN Inventario i ON p.id = i.productoId

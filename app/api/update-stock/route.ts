@@ -71,13 +71,13 @@ export async function POST(req: NextRequest) {
     }
 
     // Verificar que el almacén existe
-    const almacen = db.prepare('SELECT * FROM Almacen WHERE id = ?').get(almacenId);
+    const almacen = db.prepare('SELECT id, codigo, nombre FROM Almacen WHERE id = ?').get(almacenId);
     
     if (!almacen) {
-      const almacenes = db.prepare('SELECT id, nombre FROM Almacen').all() as Almacen[];
+      const almacenes = db.prepare('SELECT id, codigo, nombre FROM Almacen').all() as Almacen[];
       return new Response(
         JSON.stringify({
-          error: `El almacén ${almacenId} no existe. Almacenes disponibles: ${almacenes.map(a => `${a.id}: ${a.nombre}`).join(', ')}`
+          error: `El almacén ${almacenId} no existe. Almacenes disponibles: ${almacenes.map(a => `${a.id}: ${a.codigo} - ${a.nombre}`).join(', ')}`
         }), 
         { 
           status: 400,

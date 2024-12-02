@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { StockLimitsModal } from "@/components/modal";
-import { Producto } from "@/types/db";
+import { Producto, Almacen } from "@/types/db";
 import { Dialog } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 
@@ -32,6 +32,11 @@ interface InventoryItem extends Omit<Producto, 'id'> {
   warehouse3: number;
   warehouse4: number;
   warehouse5: number;
+  warehouse6: number;
+  warehouse7: number;
+  warehouse8: number;
+  warehouse9: number;
+  warehouse10: number;
   tiempoDeResurtido: number;
   total: number;
   almacenId?: number;
@@ -40,18 +45,29 @@ interface InventoryItem extends Omit<Producto, 'id'> {
 export default function InventoryPage() {
   const { toast } = useToast();
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const [almacenes, setAlmacenes] = useState<Almacen[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedItem, setSelectedItem] = useState<Producto | null>(null);
 
-  async function fetchInventory() {
+  async function fetchData() {
     try {
-      const response = await fetch("/api/stock");
-      if (!response.ok) {
-        throw new Error("Error al cargar el inventario");
+      const [inventoryResponse, almacenesResponse] = await Promise.all([
+        fetch("/api/stock"),
+        fetch("/api/almacenes")
+      ]);
+
+      if (!inventoryResponse.ok || !almacenesResponse.ok) {
+        throw new Error("Error al cargar los datos");
       }
-      const data = await response.json();
-      setInventory(data);
+
+      const [inventoryData, almacenesData] = await Promise.all([
+        inventoryResponse.json(),
+        almacenesResponse.json()
+      ]);
+
+      setInventory(inventoryData);
+      setAlmacenes(almacenesData);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error desconocido");
     } finally {
@@ -60,7 +76,7 @@ export default function InventoryPage() {
   }
 
   useEffect(() => {
-    fetchInventory();
+    fetchData();
   }, []);
 
   const checkStockStatus = (item: InventoryItem) => {
@@ -91,7 +107,7 @@ export default function InventoryPage() {
         throw new Error(errorData.error || "Error al actualizar límites");
       }
 
-      await fetchInventory(); // Recargar datos
+      await fetchData(); // Recargar datos
       toast({
         title: "Éxito",
         description: `Datos actualizados correctamente para: ${selectedItem.sku}`,
@@ -107,14 +123,25 @@ export default function InventoryPage() {
     }
   };
 
-  if (isLoading) return <div className="p-4">Cargando inventario...</div>;
+  if (isLoading) return (
+    <div className="p-4 pt-20">
+      <div className="flex flex-col items-center justify-center gap-4">
+        <div className="h-2 w-64 bg-gray-200 rounded-full overflow-hidden">
+          <div className="h-full bg-blue-500 animate-[shimmer_1s_ease-in-out_infinite] w-1/2" 
+               style={{
+                 animation: 'shimmer 1s ease-in-out infinite',
+                 background: 'linear-gradient(to right, transparent 0%, #3B82F6 50%, transparent 100%)',
+               }}
+          />
+        </div>
+        <p className="text-sm text-gray-500">Cargando inventario...</p>
+      </div>
+    </div>
+  );
   if (error) return <div className="p-4 text-red-500">Error: {error}</div>;
 
   return (
     <main className="p-4 md:p-6">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">Inventario</h1>
-      </div>
       <div className="rounded-md border max-h-[80vh] overflow-auto relative">
         <Table>
           <TableHeader>
@@ -130,11 +157,11 @@ export default function InventoryPage() {
                   Descripción
                 </div>
               </TableHead>
-              <TableHead className="text-right">Almacén #1</TableHead>
-              <TableHead className="text-right">Almacén #2</TableHead>
-              <TableHead className="text-right">Almacén #3</TableHead>
-              <TableHead className="text-right">Almacén #4</TableHead>
-              <TableHead className="text-right">Almacén #5</TableHead>
+              {almacenes.map((almacen) => (
+                <TableHead key={almacen.id} className="text-right whitespace-nowrap">
+                  {almacen.codigo.replace(/^0+/, '')}
+                </TableHead>
+              ))}
               <TableHead className="text-right">Total</TableHead>
               <TableHead className="text-center">Alerta</TableHead>
               <TableHead className="text-right">Resurtido</TableHead>
@@ -147,27 +174,27 @@ export default function InventoryPage() {
                 key={item.sku}
                 className={item.sku.startsWith('GCP') ? 'bg-blue-50' : ''}
               >
-                <TableCell className="font-medium">{item.sku}</TableCell>
+                <TableCell className="font-medium whitespace-nowrap">{item.sku}</TableCell>
                 <TableCell>
                   <div className="max-w-[150px] truncate hover:text-clip hover:whitespace-normal hover:overflow-visible">
                     {item.descripcion}
                   </div>
                 </TableCell>
-                <TableCell className="text-right">{(item.warehouse1 || 0).toLocaleString()}</TableCell>
-                <TableCell className="text-right">{(item.warehouse2 || 0).toLocaleString()}</TableCell>
-                <TableCell className="text-right">{(item.warehouse3 || 0).toLocaleString()}</TableCell>
-                <TableCell className="text-right">{(item.warehouse4 || 0).toLocaleString()}</TableCell>
-                <TableCell className="text-right">{(item.warehouse5 || 0).toLocaleString()}</TableCell>
+                {almacenes.map((almacen) => (
+                  <TableCell key={almacen.id} className="text-right">
+                    {(item[`warehouse${almacen.id}` as keyof typeof item] || 0).toLocaleString()}
+                  </TableCell>
+                ))}
                 <TableCell className="text-right font-medium">{(item.total || 0).toLocaleString()}</TableCell>
                 <TableCell className="text-center">
                   {checkStockStatus(item) === "min" && (
-                    <Badge variant="destructive" className="gap-2 p-2 pointer-events-none">
+                    <Badge variant="destructive" className="gap-2 p-2 pointer-events-none whitespace-nowrap">
                       <AlertTriangle className="h-4 w-4" />
                       Mínimo alcanzado
                     </Badge>
                   )}
                   {checkStockStatus(item) === "max" && (
-                    <Badge variant="warning" className="gap-2 p-2 pointer-events-none">
+                    <Badge variant="warning" className="gap-2 p-2 pointer-events-none whitespace-nowrap">
                       <AlertTriangle className="h-4 w-4" />
                       Máximo alcanzado
                     </Badge>

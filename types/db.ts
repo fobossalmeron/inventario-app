@@ -12,8 +12,8 @@ export interface Producto {
 
 export interface Almacen {
   id: number;
+  codigo: string;
   nombre: string;
-  ubicacion: string | null;
   createdAt: string;
   updatedAt: string;
 }
