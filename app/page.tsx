@@ -23,6 +23,7 @@ import { StockLimitsModal } from "@/components/modal";
 import { Producto, Almacen } from "@/types/db";
 import { Dialog } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
+import { useInView } from "react-intersection-observer";
 
 
 interface InventoryItem extends Omit<Producto, 'id'> {
@@ -47,37 +48,57 @@ export default function InventoryPage() {
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [almacenes, setAlmacenes] = useState<Almacen[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedItem, setSelectedItem] = useState<Producto | null>(null);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const { ref, inView } = useInView();
 
-  async function fetchData() {
+  const ITEMS_PER_PAGE = 50;
+
+  async function fetchData(pageNum = 1, append = false) {
     try {
+      setIsLoadingMore(append);
+      setIsLoading(!append);
+
       const [inventoryResponse, almacenesResponse] = await Promise.all([
-        fetch("/api/stock"),
-        fetch("/api/almacenes")
+        fetch(`/api/stock?page=${pageNum}&limit=${ITEMS_PER_PAGE}`),
+        !append ? fetch("/api/almacenes") : Promise.resolve(null)
       ]);
 
-      if (!inventoryResponse.ok || !almacenesResponse.ok) {
+      if (!inventoryResponse.ok || (!append && !almacenesResponse?.ok)) {
         throw new Error("Error al cargar los datos");
       }
 
       const [inventoryData, almacenesData] = await Promise.all([
         inventoryResponse.json(),
-        almacenesResponse.json()
+        !append ? almacenesResponse?.json() : Promise.resolve(null)
       ]);
 
-      setInventory(inventoryData);
-      setAlmacenes(almacenesData);
+      setInventory(prev => append ? [...prev, ...inventoryData.items] : inventoryData.items);
+      setHasMore(inventoryData.hasMore);
+      if (!append && almacenesData) {
+        setAlmacenes(almacenesData);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error desconocido");
     } finally {
       setIsLoading(false);
+      setIsLoadingMore(false);
     }
   }
 
   useEffect(() => {
     fetchData();
   }, []);
+
+  useEffect(() => {
+    if (inView && hasMore && !isLoadingMore) {
+      setPage(prev => prev + 1);
+      fetchData(page + 1, true);
+    }
+  }, [inView, hasMore, isLoadingMore]);
 
   const checkStockStatus = (item: InventoryItem) => {
     if (item.stockMinimo != null && item.total <= item.stockMinimo) return "min";
@@ -227,6 +248,20 @@ export default function InventoryPage() {
                 </TableCell>
               </TableRow>
             ))}
+            {hasMore && (
+              <TableRow ref={ref}>
+                <TableCell colSpan={8 + almacenes.length} className="text-center p-4">
+                  {isLoadingMore ? (
+                    <div className="flex justify-center items-center gap-2">
+                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                      <span className="text-sm text-muted-foreground">
+                        Cargando más productos...
+                      </span>
+                    </div>
+                  ) : null}
+                </TableCell>
+              </TableRow>
+            )}
           </TableBody>
         </Table>
       </div>

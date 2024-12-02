@@ -1,104 +1,69 @@
-import { NextResponse } from 'next/server';
-import db from '@/lib/db';
-import { Producto, CreateInventarioDTO, UpdateInventarioDTO } from '@/types/db';
+import { NextRequest, NextResponse } from "next/server";
+import db from "@/lib/db";
+import { Producto } from "@/types/db";
 
-export async function GET() {
+interface StockCount {
+  count: number;
+}
+
+interface RawProduct extends Omit<Producto, 'nombre' | 'createdAt' | 'updatedAt'> {
+  inventory_data: string | null;
+}
+
+export async function GET(request: NextRequest) {
+  const searchParams = request.nextUrl.searchParams;
+  const page = parseInt(searchParams.get("page") || "1");
+  const limit = parseInt(searchParams.get("limit") || "50");
+  const offset = (page - 1) * limit;
+
   try {
-    // Obtener productos con su inventario agregado por almacén
-    const inventory = db.prepare(`
+    const countResult = db.prepare(`
+      SELECT COUNT(*) as count FROM Producto
+    `).get() as StockCount;
+
+    const totalCount = countResult.count;
+
+    const products = db.prepare(`
       SELECT 
         p.*,
-        SUM(CASE WHEN i.almacenId = 1 THEN i.cantidad ELSE 0 END) as warehouse1,
-        SUM(CASE WHEN i.almacenId = 2 THEN i.cantidad ELSE 0 END) as warehouse2,
-        SUM(CASE WHEN i.almacenId = 3 THEN i.cantidad ELSE 0 END) as warehouse3,
-        SUM(CASE WHEN i.almacenId = 4 THEN i.cantidad ELSE 0 END) as warehouse4,
-        SUM(CASE WHEN i.almacenId = 5 THEN i.cantidad ELSE 0 END) as warehouse5,
-        SUM(CASE WHEN i.almacenId = 6 THEN i.cantidad ELSE 0 END) as warehouse6,
-        SUM(CASE WHEN i.almacenId = 7 THEN i.cantidad ELSE 0 END) as warehouse7,
-        SUM(CASE WHEN i.almacenId = 8 THEN i.cantidad ELSE 0 END) as warehouse8,
-        SUM(CASE WHEN i.almacenId = 9 THEN i.cantidad ELSE 0 END) as warehouse9,
-        SUM(CASE WHEN i.almacenId = 10 THEN i.cantidad ELSE 0 END) as warehouse10,
-        SUM(i.cantidad) as total
+        GROUP_CONCAT(i.cantidad || ',' || i.almacenId) as inventory_data
       FROM Producto p
       LEFT JOIN Inventario i ON p.id = i.productoId
       GROUP BY p.id
-    `).all();
+      LIMIT ? OFFSET ?
+    `).all(limit, offset) as RawProduct[];
 
-    return NextResponse.json(inventory);
-  } catch (error) {
-    console.error('Error al obtener inventario:', error);
-    return NextResponse.json(
-      { error: 'Error al obtener inventario' },
-      { status: 500 }
-    );
-  }
-}
+    const processedProducts = products.map(product => {
+      const warehouseStocks: { [key: string]: number } = {};
+      let total = 0;
 
-export async function POST(request: Request) {
-  try {
-    const body: CreateInventarioDTO = await request.json();
-    
-    const result = db.transaction(() => {
-      // Verificar límites de stock
-      const producto = db.prepare('SELECT stockMinimo, stockMaximo FROM Producto WHERE id = ?')
-        .get(body.productoId) as Pick<Producto, 'stockMinimo' | 'stockMaximo'>;
-      
-      if (!producto) throw new Error('Producto no encontrado');
-      
-      if (body.cantidad < producto.stockMinimo || body.cantidad > producto.stockMaximo) {
-        throw new Error('Cantidad fuera de los límites permitidos');
+      if (product.inventory_data) {
+        const inventoryItems = product.inventory_data.split(',');
+        for (let i = 0; i < inventoryItems.length; i += 2) {
+          const cantidad = parseInt(inventoryItems[i]);
+          const almacenId = parseInt(inventoryItems[i + 1]);
+          warehouseStocks[`warehouse${almacenId}`] = cantidad;
+          total += cantidad;
+        }
       }
 
-      return db.prepare(`
-        INSERT INTO Inventario (productoId, almacenId, cantidad)
-        VALUES (?, ?, ?)
-      `).run(body.productoId, body.almacenId, body.cantidad);
-    })();
+      return {
+        ...product,
+        ...warehouseStocks,
+        total,
+      };
+    });
 
-    return NextResponse.json({ success: true, id: result.lastInsertRowid });
+    return NextResponse.json({
+      items: processedProducts,
+      hasMore: offset + limit < totalCount,
+      total: totalCount
+    });
+
   } catch (error) {
-    console.error('Error al crear inventario:', error);
+    console.error('Error en /api/stock:', error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Error al crear inventario' },
-      { status: 500 }
-    );
-  }
-}
-
-export async function PUT(request: Request) {
-  try {
-    const body: UpdateInventarioDTO = await request.json();
-    
-    const result = db.transaction(() => {
-      // Verificar límites de stock
-      const producto = db.prepare('SELECT stockMinimo, stockMaximo FROM Producto WHERE id = ?')
-        .get(body.productoId) as Pick<Producto, 'stockMinimo' | 'stockMaximo'>;
-      
-      if (!producto) throw new Error('Producto no encontrado');
-      
-      if (body.cantidad < producto.stockMinimo || body.cantidad > producto.stockMaximo) {
-        throw new Error('Cantidad fuera de los límites permitidos');
-      }
-
-      return db.prepare(`
-        UPDATE Inventario 
-        SET cantidad = ?, updatedAt = CURRENT_TIMESTAMP
-        WHERE productoId = ? AND almacenId = ?
-      `).run(body.cantidad, body.productoId, body.almacenId);
-    })();
-
-    if (result.changes === 0) {
-      return NextResponse.json(
-        { error: 'Registro de inventario no encontrado' },
-        { status: 404 }
-      );
-    }
-
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error('Error al actualizar inventario:', error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Error al actualizar inventario' },
+      { error: "Error al obtener el inventario" },
       { status: 500 }
     );
   }

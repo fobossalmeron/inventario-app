@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { Almacen } from "@/types/db";
@@ -143,7 +143,10 @@ export function UploadModal({ open, onOpenChange, almacenes }: UploadModalProps)
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Actualizar Inventario</DialogTitle>
+          <DialogTitle>Subir inventario</DialogTitle>
+          <DialogDescription>
+            Arrastra o selecciona un archivo CSV con el inventario del almacén.
+          </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
           {detectedAlmacen && (
