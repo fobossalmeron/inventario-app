@@ -70,7 +70,9 @@ async function main() {
         { codigo: '0007-AGOM', nombre: 'Gómez Farías' },
         { codigo: '0008-AMON', nombre: 'Monterrey' },
         { codigo: '0009-AEM', nombre: 'Empaque' },
-        { codigo: '0010-ARM', nombre: 'Recepción de Mercancía' }
+        { codigo: '0010-ARM', nombre: 'Recepción de Mercancía' },
+        { codigo: '0020-PRES', nombre: 'Préstamos' },
+
       ];
       
       for (const almacen of almacenes) {
