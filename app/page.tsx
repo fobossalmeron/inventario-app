@@ -27,6 +27,12 @@ import { useInView } from "react-intersection-observer";
 import { Input } from "@/components/ui/input"
 import { useDebounce } from "@/hooks/use-debounce";
 import { Search } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface InventoryItem extends Omit<Producto, 'id'> {
   id: number;
@@ -195,8 +201,8 @@ export default function InventoryPage() {
                 </div>
               </TableHead>
               <TableHead className="w-[150px]">
-                <div className="truncate hover:text-clip hover:whitespace-normal">
-                  Descripción
+                <div className="truncate">
+                  Nombre
                 </div>
               </TableHead>
               {almacenes.map((almacen) => (
@@ -218,9 +224,18 @@ export default function InventoryPage() {
               >
                 <TableCell className="font-medium whitespace-nowrap">{item.sku}</TableCell>
                 <TableCell>
-                  <div className="max-w-[150px] truncate hover:text-clip hover:whitespace-normal hover:overflow-visible">
-                    {item.descripcion}
-                  </div>
+                  <TooltipProvider>
+                    <Tooltip delayDuration={0}>
+                      <TooltipTrigger asChild>
+                        <div className="max-w-[150px] truncate">
+                          {item.descripcion}
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>{item.descripcion}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 </TableCell>
                 {almacenes.map((almacen) => (
                   <TableCell key={almacen.id} className="text-right">
