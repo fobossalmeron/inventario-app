@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { revalidatePath } from "next/cache";
 import db from "@/lib/db";
 import { Producto, Almacen } from "@/types/db";
 
@@ -136,6 +137,9 @@ export async function POST(req: NextRequest) {
 
       return { updatedProducts, updatedInventory };
     })();
+
+    // Revalidar la ruta raíz
+    revalidatePath('/', 'page');
 
     return new Response(
       JSON.stringify({

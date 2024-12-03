@@ -130,6 +130,9 @@ export function UploadModal({ open, onOpenChange, almacenes }: UploadModalProps)
       setFile(null);
       setDetectedAlmacen(null);
       onOpenChange(false);
+      
+      // Forzar recarga completa de la página
+      window.location.reload();
     } catch (error) {
       toast({
         variant: "destructive",
