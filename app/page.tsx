@@ -24,7 +24,9 @@ import { Producto, Almacen } from "@/types/db";
 import { Dialog } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useInView } from "react-intersection-observer";
-
+import { Input } from "@/components/ui/input"
+import { useDebounce } from "@/hooks/use-debounce";
+import { Search } from "lucide-react";
 
 interface InventoryItem extends Omit<Producto, 'id'> {
   id: number;
@@ -54,6 +56,8 @@ export default function InventoryPage() {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const { ref, inView } = useInView();
+  const [search, setSearch] = useState("");
+  const debouncedSearch = useDebounce(search, 500);
 
   const ITEMS_PER_PAGE = 50;
 
@@ -63,7 +67,7 @@ export default function InventoryPage() {
       setIsLoading(!append);
 
       const [inventoryResponse, almacenesResponse] = await Promise.all([
-        fetch(`/api/stock?page=${pageNum}&limit=${ITEMS_PER_PAGE}`),
+        fetch(`/api/stock?page=${pageNum}&limit=${ITEMS_PER_PAGE}&search=${debouncedSearch}`),
         !append ? fetch("/api/almacenes") : Promise.resolve(null)
       ]);
 
@@ -99,6 +103,12 @@ export default function InventoryPage() {
       fetchData(page + 1, true);
     }
   }, [inView, hasMore, isLoadingMore]);
+
+  useEffect(() => {
+    setPage(1);
+    setInventory([]);
+    fetchData(1, false);
+  }, [debouncedSearch]);
 
   const checkStockStatus = (item: InventoryItem) => {
     if (item.stockMinimo != null && item.total <= item.stockMinimo) return "min";
@@ -163,6 +173,17 @@ export default function InventoryPage() {
 
   return (
     <main className="p-4 md:p-6">
+      <div className="mb-4 flex justify-end">
+        <div className="relative w-full max-w-md">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Buscar por SKU o nombre..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9 w-full"
+          />
+        </div>
+      </div>
       <div className="rounded-md border max-h-[80vh] overflow-auto relative">
         <Table>
           <TableHeader>

@@ -2,66 +2,61 @@ import { NextRequest, NextResponse } from "next/server";
 import db from "@/lib/db";
 import { Producto } from "@/types/db";
 
-interface StockCount {
-  count: number;
-}
-
-interface RawProduct extends Omit<Producto, 'nombre' | 'createdAt' | 'updatedAt'> {
+interface StockItem extends Producto {
+  total: number;
   inventory_data: string | null;
 }
 
 export async function GET(request: NextRequest) {
-  const searchParams = request.nextUrl.searchParams;
+  const { searchParams } = new URL(request.url);
   const page = parseInt(searchParams.get("page") || "1");
   const limit = parseInt(searchParams.get("limit") || "50");
+  const search = searchParams.get("search") || "";
+
   const offset = (page - 1) * limit;
 
   try {
-    const countResult = db.prepare(`
-      SELECT COUNT(*) as count FROM Producto
-    `).get() as StockCount;
+    const searchQuery = search 
+      ? `WHERE (p.sku LIKE ? OR p.descripcion LIKE ?)` 
+      : '';
+    const searchParams = search 
+      ? [`%${search}%`, `%${search}%`] 
+      : [];
 
-    const totalCount = countResult.count;
-
-    const products = db.prepare(`
+    const items = db.prepare(`
       SELECT 
         p.*,
-        GROUP_CONCAT(i.cantidad || ',' || i.almacenId) as inventory_data
+        COALESCE(SUM(i.cantidad), 0) as total,
+        GROUP_CONCAT(i.almacenId || ':' || COALESCE(i.cantidad, 0)) as inventory_data
       FROM Producto p
       LEFT JOIN Inventario i ON p.id = i.productoId
+      ${searchQuery}
       GROUP BY p.id
       LIMIT ? OFFSET ?
-    `).all(limit, offset) as RawProduct[];
+    `).all([...searchParams, limit, offset]) as StockItem[];
 
-    const processedProducts = products.map(product => {
-      const warehouseStocks: { [key: string]: number } = {};
-      let total = 0;
-
-      if (product.inventory_data) {
-        const inventoryItems = product.inventory_data.split(',');
-        for (let i = 0; i < inventoryItems.length; i += 2) {
-          const cantidad = parseInt(inventoryItems[i]);
-          const almacenId = parseInt(inventoryItems[i + 1]);
-          warehouseStocks[`warehouse${almacenId}`] = cantidad;
-          total += cantidad;
-        }
-      }
+    // Procesar los resultados para el formato esperado
+    const processedItems = items.map(item => {
+      const warehouseData = item.inventory_data
+        ? item.inventory_data.split(',').reduce((acc: Record<string, number>, curr: string) => {
+            const [warehouseId, quantity] = curr.split(':');
+            acc[`warehouse${warehouseId}`] = parseInt(quantity);
+            return acc;
+          }, {})
+        : {};
 
       return {
-        ...product,
-        ...warehouseStocks,
-        total,
+        ...item,
+        ...warehouseData,
+        inventory_data: undefined
       };
     });
 
-    return NextResponse.json({
-      items: processedProducts,
-      hasMore: offset + limit < totalCount,
-      total: totalCount
-    });
+    const hasMore = items.length === limit;
 
-  } catch (error) {
-    console.error('Error en /api/stock:', error);
+    return NextResponse.json({ items: processedItems, hasMore });
+  } catch (err) {
+    console.error('Error en /api/stock:', err);
     return NextResponse.json(
       { error: "Error al obtener el inventario" },
       { status: 500 }
